@@ -21,6 +21,7 @@ import net.minecraft.text.TranslatableText;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Matrix4f;
 import net.minecraft.world.SaveProperties;
+import net.minecraft.world.World;
 import net.minecraft.world.biome.BeachBiome;
 import net.minecraft.world.biome.Biome;
 import org.apache.logging.log4j.Level;
@@ -69,6 +70,22 @@ public abstract class LevelLoadingScreenMixin extends Screen {
         }
         return worldpreview_getChunkMapPos().y;
     }
+
+    private boolean hasBeach(int radius){
+        BlockPos spawnPos = WorldPreview.player.getBlockPos();
+        World world = WorldPreview.player.getEntityWorld();
+        for(int x = -radius; x < radius; x++){
+            for(int z = -radius; z < radius; z++){
+                BlockPos newPos = spawnPos.add(x, 0, z);
+                Biome biome = world.getBiome(newPos);
+                if(biome instanceof BeachBiome){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     @Inject(method = "render",at=@At("HEAD"))
     public void worldpreview_render(MatrixStack matrices, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         if(WorldPreview.world!=null&& WorldPreview.clientWord!=null&&WorldPreview.player!=null&&!WorldPreview.freezePreview) {
@@ -79,15 +96,16 @@ public abstract class LevelLoadingScreenMixin extends Screen {
                 this.worldpreview_initWidgets();
             }
             if (((WorldRendererMixin)WorldPreview.worldRenderer).getWorld()!=null) {
-                SaveProperties sp = Objects.requireNonNull(WorldPreview.world.getServer()).getSaveProperties();
-                if(sp.getLevelName().startsWith("Random")) {
-                    BlockPos spawnPos = WorldPreview.player.getBlockPos();
-                    Biome spawnBiome = WorldPreview.player.getEntityWorld().getBiome(spawnPos);
-                    if (!(spawnBiome instanceof BeachBiome)) {
-                        WorldPreview.inPreview = true;
-                        WorldPreview.kill = -1;
-                        WorldPreview.log(Level.INFO,"Auto resetting because no beach");
-                        return;
+                if(WorldPreview.camera == null) {
+                    SaveProperties sp = Objects.requireNonNull(WorldPreview.world.getServer()).getSaveProperties();
+                    if (sp.getLevelName().startsWith("Random")) {
+                        int radius = 5;
+                        if (!hasBeach(radius)) {
+                            WorldPreview.inPreview = true;
+                            WorldPreview.kill = -1;
+                            WorldPreview.log(Level.INFO, "Auto resetting because no beach in radius " + radius);
+                            return;
+                        }
                     }
                 }
                 KeyBinding.unpressAll();
